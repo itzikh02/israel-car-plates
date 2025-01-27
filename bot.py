@@ -56,7 +56,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         conn.commit()
 
     await update.message.reply_text(
-        f"Hello! {update.message.from_user.username} send me a plate number!"
+        f"שלום {update.message.from_user.first_name}, שלח לי מספר רכב ואני אבדוק לך את הפרטים שלו."
     )
 
     # send a silent message to the admin
@@ -65,6 +65,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         text=f"User {update.message.from_user.username} started the bot.",
         disable_notification=True,
     )
+
+    add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) started the bot.", "start")
 
 
 # Convert json to nice telegram message
@@ -135,7 +137,7 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         data = response.json()
         if data["result"]["total"] == 0:
             await update.message.reply_text("אין תוצאות למספר רכב זה")
-            add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered a non existing plate number {plate}", "lost")
+            add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered a non existing plate number: {plate}", "lost")
             return
         result = json_to_message(data["result"]["records"])
         await update.message.reply_text(f"{result}", parse_mode="Markdown")
@@ -151,7 +153,7 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 # admin command to send a broadcast message to all users
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if str(update.message.from_user.id) != str(ADMIN_ID):
-        log = f"Unauthorized user {update.message.from_user.username} ({update.message.from_user.id}) tried to send a broadcast message."
+        log = f"Unauthorized user {update.message.from_user.username} ({update.message.from_user.id}) tried to send a broadcast message: {context.args[0]}"
         add_log(log, "security")
         return
 
