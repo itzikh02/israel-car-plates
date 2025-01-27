@@ -36,7 +36,6 @@ conn.commit()
 conn.close()
 
 # send logs to ./logs/security.log or plates.log
-
 def add_log(log, log_file):
     now = datetime.datetime.now()
     log = f"{now.strftime('%Y-%m-%d %H:%M:%S')} {log}"
@@ -124,6 +123,7 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text(
             "Invalid plate number! Please enter a valid plate number."
         )
+        add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered an invalid plate number {plate}", "lost")
         return
 
     url = f"https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&q={plate}"
@@ -135,6 +135,7 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         data = response.json()
         if data["result"]["total"] == 0:
             await update.message.reply_text("אין תוצאות למספר רכב זה")
+            add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered a non existing plate number {plate}", "lost")
             return
         result = json_to_message(data["result"]["records"])
         await update.message.reply_text(f"{result}", parse_mode="Markdown")
@@ -143,7 +144,7 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text(
             "שגיאת תקשורת, אנא נסה שוב מאוחר יותר."
         )
-        add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) tried to check plate number {plate} but got an error", "plates")
+        add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) tried to check plate number {plate} but got an error", "lost")
         
 
 
