@@ -21,7 +21,15 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 # Define a simple command handler function
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Hello! I am your bot.")
+    await update.message.reply_text(f"Hello! {update.message.from_user.username} send me a plate number!")
+    
+    # send a silent message to the admin
+    await context.bot.send_message(
+        chat_id=os.getenv("ADMIN__ID"),
+        # text = username
+        text=f"User {update.message.from_user.username} started the bot.",
+        disable_notification=True,
+    )
 
 
 # Define a message handler function to receive and respond to text messages
@@ -33,7 +41,6 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             "Invalid plate number! Please enter a valid plate number."
         )
         return
-    await update.message.reply_text(f"Checking plate number: {plate}")
 
     url = f"https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&q={plate}"
     response = requests.get(url)
