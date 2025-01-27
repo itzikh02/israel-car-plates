@@ -121,9 +121,9 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # check if plate is valid (between 6 and 8 numbers)
     if not plate.isdigit() or len(plate) < 6 or len(plate) > 8:
         await update.message.reply_text(
-            "Invalid plate number! Please enter a valid plate number."
+            "מספר רכב לא תקין, אנא הזן מספר רכב תקין."
         )
-        add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered an invalid plate number {plate}", "lost")
+        add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered an invalid message: {plate}", "lost")
         return
 
     url = f"https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&q={plate}"
