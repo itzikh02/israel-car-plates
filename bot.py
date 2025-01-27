@@ -25,7 +25,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # send a silent message to the admin
     await context.bot.send_message(
-        chat_id=os.getenv("ADMIN__ID"),
+        chat_id=os.getenv("ADMIN_ID"),
         # text = username
         text=f"User {update.message.from_user.username} started the bot.",
         disable_notification=True,
