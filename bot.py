@@ -152,8 +152,9 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 # admin command to send a broadcast message to all users
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = " ".join(context.args)
     if str(update.message.from_user.id) != str(ADMIN_ID):
-        log = f"Unauthorized user {update.message.from_user.username} ({update.message.from_user.id}) tried to send a broadcast message: {context.args[0]}"
+        log = f"Unauthorized user {update.message.from_user.username} ({update.message.from_user.id}) tried to send a broadcast message: {message}"
         add_log(log, "security")
         return
 
@@ -166,7 +167,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Send the message to all the users
     for user in users:
-        await context.bot.send_message(chat_id=user["id"], text=context.args[0])
+        await context.bot.send_message(chat_id=user["id"], text=message)
 
     await update.message.reply_text(f"Broadcast message sent to {len(users)} users.")
 
