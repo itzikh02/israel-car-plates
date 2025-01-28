@@ -11,3 +11,5 @@
 # ignore ./log contents but not the directory itself
 /logs/*
 !/logs/
+
+channelIdFind.py
