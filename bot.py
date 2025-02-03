@@ -185,6 +185,16 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await update.message.reply_text(f"Broadcast message sent to {len(users)} users.")
 
+async def beta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = " ".join(context.args)
+    message = message.replace("\\n", "\n")  # Replace literal "\n" with a newline
+    if str(update.message.from_user.id) != str(ADMIN_ID):
+        log = f"Unauthorized user {update.message.from_user.username} ({update.message.from_user.id}) tried to send a broadcast message: {message}"
+        await add_log(log, "security", context)
+        return
+
+    await context.bot.send_message(chat_id=ADMIN_ID, text=message, parse_mode="Markdown")
+
 
 # Main function to set up and start the bot
 def main():
@@ -197,6 +207,7 @@ def main():
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("beta", beta))
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, check_plate)
     )
