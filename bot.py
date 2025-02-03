@@ -19,6 +19,7 @@ load_dotenv()
 # Get the Telegram bot token from the environment variable
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
+LOGS_CHANNEL_ID = os.getenv("LOGS_CHANNEL_ID")
 
 # connect to the database, create a table if it doesn't exist
 
@@ -35,12 +36,15 @@ cursor.execute(
 conn.commit()
 conn.close()
 
-# send logs to ./logs/security.log or plates.log
-def add_log(log, log_file):
+# send logs to file and to logs channel
+async def add_log(log, log_file, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.now()
     log = f"{now.strftime('%Y-%m-%d %H:%M:%S')} {log}"
     with open(f"./logs/{log_file}.log", "a") as f:
         f.write(log + "\n")
+    
+    # send the log to the logs channel
+    await context.bot.send_message(chat_id=LOGS_CHANNEL_ID, text=log, parse_mode="Markdown", disable_notification=True)
 
 
 
@@ -50,7 +54,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     with sqlite3.connect("./db/users.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO users (id, username) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO users (id, username) VALUES (?, ?)",
             (update.message.from_user.id, update.message.from_user.username),
         )
         conn.commit()
@@ -59,14 +63,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"שלום {update.message.from_user.first_name}, שלח לי מספר רכב ואני אבדוק לך את הפרטים שלו."
     )
 
-    # send a silent message to the admin
-    await context.bot.send_message(
-        chat_id=ADMIN_ID,
-        text=f"User {update.message.from_user.username} started the bot.",
-        disable_notification=True,
-    )
-
-    add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) started the bot.", "start")
+    await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) started the bot.", "start", context)
 
 
 # Convert json to nice telegram message
@@ -138,7 +135,7 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text(
             "מספר רכב לא תקין, אנא הזן מספר רכב תקין."
         )
-        add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered an invalid message: {plate}", "lost")
+        await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered an invalid message: {plate}", "lost", context)
         return
 
     url = f"https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&q={plate}"
@@ -150,21 +147,21 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         data = response.json()
         if data["result"]["total"] == 0:
             await update.message.reply_text("אין תוצאות למספר רכב זה")
-            add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered a non existing plate number: {plate}", "lost")
+            await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered a non existing plate number: {plate}", "lost", context)
             return
         disabled = is_disabled(plate)
         data["result"]["records"][0]["disabled"] = "כן" if disabled else "לא"
         result = json_to_message(data["result"]["records"])
                             
         await update.message.reply_text(f"{result}", parse_mode="Markdown")
-        add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) checked plate number {plate}", "plates")
+        await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) checked plate number {plate}", "plates", context)
     
     # If the request was not successful
     else:
         await update.message.reply_text(
             "שגיאת תקשורת, אנא נסה שוב מאוחר יותר."
         )
-        add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) tried to check plate number {plate} but got an error", "lost")
+        await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) tried to check plate number {plate} but got an error", "lost", context)
         
 # admin command to send a broadcast message to all users
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -172,7 +169,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = message.replace("\\n", "\n")  # Replace literal "\n" with a newline
     if str(update.message.from_user.id) != str(ADMIN_ID):
         log = f"Unauthorized user {update.message.from_user.username} ({update.message.from_user.id}) tried to send a broadcast message: {message}"
-        add_log(log, "security")
+        await add_log(log, "security", context)
         return
 
     # get all users from the db using with statement
