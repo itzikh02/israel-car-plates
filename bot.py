@@ -98,28 +98,41 @@ def json_to_message(data):
     #      "kinuy_mishari": "MAZDA 2",
     #      "rank": 0.0573088
     # }
+
     message = (
-        f"*תוצאות בדיקה למספר רכב: {data[0]['mispar_rechev']}\n*"
-        f"*יצרן:* {data[0]['tozeret_nm']}\n"
-        f"*דגם:* {data[0]['kinuy_mishari']}\n"
-        f"*מספר דגם:* {data[0]['degem_nm']}\n"
-        f"*מנוע:* {data[0]['degem_manoa']}\n"
-        f"*שנת יצור:* {data[0]['shnat_yitzur']}\n"
-        f"*תאריך עלייה לכביש:* {data[0]['moed_aliya_lakvish']}\n"
-        f"*צבע:* {data[0]['tzeva_rechev']}\n"
-        f"*סוג דלק:* {data[0]['sug_delek_nm']}\n"
-        f"*בעלות:* {data[0]['baalut']}\n"
-        f"*תוקף רישום:* {data[0]['tokef_dt']}\n"
-        f"*מבחן אחרון:* {data[0]['mivchan_acharon_dt']}\n"
-        f"-------------------\n"
-    )
+    f"🚗 *תוצאות בדיקה לרכב:* {data[0]['mispar_rechev']}\n"
+    f"🏭 *יצרן:* {data[0]['tozeret_nm']}\n"
+    f"🚘 *דגם:* {data[0]['kinuy_mishari']}\n"
+    f"🔢 *מספר דגם:* {data[0]['degem_nm']}\n"
+    f"⚙️ *מנוע:* {data[0]['degem_manoa']}\n"
+    f"📅 *שנת ייצור:* `{data[0]['shnat_yitzur']}`\n"
+    f"🛣 *תאריך עלייה לכביש:* `{data[0]['moed_aliya_lakvish']}`\n"
+    f"🎨 *צבע:* {data[0]['tzeva_rechev']}\n"
+    f"⛽ *סוג דלק:* {data[0]['sug_delek_nm']}\n"
+    f"👤 *בעלות:* {data[0]['baalut']}\n"
+    f"📝 *תוקף רישום:* `{data[0]['tokef_dt']}`\n"
+    f"🔍 *מבחן אחרון:* `{data[0]['mivchan_acharon_dt']}`\n"
+    f"♿ *תו נכה:* {data[0]['disabled']}\n"
+    f"הופק על ידי @israelcarplatesbot\n"
+)
 
     return message
 
+# check if the car has a disabled badge
+def is_disabled(plate):
+    url = f"https://data.gov.il/api/3/action/datastore_search?resource_id=c8b9f9c8-4612-4068-934f-d4acd2e3c06e&q={plate}"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data["result"]["total"] == 0:
+            return False
+        return True
 
 # check the plate number in the API and send the result to the user
 async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     plate = update.message.text
+
     # check if plate is valid (between 6 and 8 numbers)
     if not plate.isdigit() or len(plate) < 6 or len(plate) > 8:
         await update.message.reply_text(
@@ -139,17 +152,20 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await update.message.reply_text("אין תוצאות למספר רכב זה")
             add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered a non existing plate number: {plate}", "lost")
             return
+        disabled = is_disabled(plate)
+        data["result"]["records"][0]["disabled"] = "כן" if disabled else "לא"
         result = json_to_message(data["result"]["records"])
+                            
         await update.message.reply_text(f"{result}", parse_mode="Markdown")
         add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) checked plate number {plate}", "plates")
+    
+    # If the request was not successful
     else:
         await update.message.reply_text(
             "שגיאת תקשורת, אנא נסה שוב מאוחר יותר."
         )
         add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) tried to check plate number {plate} but got an error", "lost")
         
-
-
 # admin command to send a broadcast message to all users
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = " ".join(context.args)
@@ -190,7 +206,6 @@ def main():
 
     # Start the bot
     application.run_polling()
-
 
 if __name__ == "__main__":
     main()
