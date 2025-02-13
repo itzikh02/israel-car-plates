@@ -9,19 +9,17 @@ from telegram.ext import (
     ContextTypes,
 )
 
-import requests
 import sqlite3
 import datetime
+from betterReq import getData
+
+
 
 # Load the environment variables from the .env file
 load_dotenv()
-
-# Get the Telegram bot token from the environment variable
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
 LOGS_CHANNEL_ID = os.getenv("LOGS_CHANNEL_ID")
-
-# connect to the database, create a table if it doesn't exist
 
 conn = sqlite3.connect("./db/users.db")
 cursor = conn.cursor()
@@ -36,6 +34,7 @@ cursor.execute(
 conn.commit()
 conn.close()
 
+
 # send logs to file and to logs channel
 async def add_log(log, log_file, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.now()
@@ -47,9 +46,9 @@ async def add_log(log, log_file, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=LOGS_CHANNEL_ID, text=log, parse_mode="Markdown", disable_notification=True)
 
 
-
 # Define a simple command handler function
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    
     # add user to the db using with statement
     with sqlite3.connect("./db/users.db") as conn:
         cursor = conn.cursor()
@@ -68,63 +67,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Convert json to nice telegram message
 def json_to_message(data):
-    #     {
-    #      "_id": 3845250,
-    #      "mispar_rechev": 1515766,
-    #      "tozeret_cd": 588,
-    #      "sug_degem": "P",
-    #      "tozeret_nm": "מזדה יפן",
-    #      "degem_cd": 201,
-    #      "degem_nm": "DE145",
-    #      "ramat_gimur": "DYNAMIC",
-    #      "ramat_eivzur_betihuty": null,
-    #      "kvutzat_zihum": 15,
-    #      "shnat_yitzur": 2008,
-    #      "degem_manoa": "ZY",
-    #      "mivchan_acharon_dt": "2025-01-19",
-    #      "tokef_dt": "2026-01-20",
-    #      "baalut": "פרטי",
-    #      "misgeret": "JMZDE1455-80116998",
-    #      "tzeva_cd": 30,
-    #      "tzeva_rechev": "כחול",
-    #      "zmig_kidmi": "185/55R15",
-    #      "zmig_ahori": "185/55R15",
-    #      "sug_delek_nm": "בנזין",
-    #      "horaat_rishum": null,
-    #      "moed_aliya_lakvish": null,
-    #      "kinuy_mishari": "MAZDA 2",
-    #      "rank": 0.0573088
-    # }
+    basic = data['basic']
+    history = data['history']
+    disabled = "כן" if data['disabled'] == 1 else "לא"
 
     message = (
-    f"🚗 *תוצאות בדיקה לרכב:* {data[0]['mispar_rechev']}\n"
-    f"🏭 *יצרן:* {data[0]['tozeret_nm']}\n"
-    f"🚘 *דגם:* {data[0]['kinuy_mishari']}\n"
-    f"🔢 *מספר דגם:* {data[0]['degem_nm']}\n"
-    f"⚙️ *מנוע:* {data[0]['degem_manoa']}\n"
-    f"📅 *שנת ייצור:* `{data[0]['shnat_yitzur']}`\n"
-    f"🛣 *תאריך עלייה לכביש:* `{data[0]['moed_aliya_lakvish']}`\n"
-    f"🎨 *צבע:* {data[0]['tzeva_rechev']}\n"
-    f"⛽ *סוג דלק:* {data[0]['sug_delek_nm']}\n"
-    f"👤 *בעלות:* {data[0]['baalut']}\n"
-    f"📝 *תוקף רישום:* `{data[0]['tokef_dt']}`\n"
-    f"🔍 *מבחן אחרון:* `{data[0]['mivchan_acharon_dt']}`\n"
-    f"♿ *תו נכה:* {data[0]['disabled']}\n"
-    f"הופק על ידי @israelcarplatesbot\n"
-)
+        f"🚗 *תוצאות בדיקה לרכב:* {basic['mispar_rechev']}\n"
+        f"🏭 *יצרן:* {basic['tozeret_nm']}\n"
+        f"🚘 *דגם:* {basic['kinuy_mishari']}\n"
+        f"🔢 *מספר דגם:* {basic['degem_nm']}\n"
+        f"⚙️ *מנוע:* {basic['degem_manoa']}\n"
+        f"📅 *שנת ייצור:* `{basic['shnat_yitzur']}`\n"
+        f"🛣 *תאריך עלייה לכביש:* `{basic['moed_aliya_lakvish']}`\n"
+        f"🎨 *צבע:* {basic['tzeva_rechev']}\n"
+        f"⛽ *סוג דלק:* {basic['sug_delek_nm']}\n"
+        f"👤 *בעלות:* {basic['baalut']}\n"
+        f"📝 *תוקף רישום:* `{basic['tokef_dt']}`\n"
+        f"🔍 *מבחן אחרון:* `{basic['mivchan_acharon_dt']}`\n"
+        f"📏 *קילומטראז':* {history} ק\"מ\n"
+        f"♿ *תו נכה:* {disabled}\n\n"
+        f"הופק על ידי @israelcarplatesbot\n"
+    )
 
     return message
-
-# check if the car has a disabled badge
-def is_disabled(plate):
-    url = f"https://data.gov.il/api/3/action/datastore_search?resource_id=c8b9f9c8-4612-4068-934f-d4acd2e3c06e&q={plate}"
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        data = response.json()
-        if data["result"]["total"] == 0:
-            return False
-        return True
 
 # check the plate number in the API and send the result to the user
 async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -138,30 +103,17 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered an invalid message: {plate}", "lost", context)
         return
 
-    url = f"https://data.gov.il/api/3/action/datastore_search?resource_id=053cea08-09bc-40ec-8f7a-156f0677aff3&q={plate}"
-    response = requests.get(url)
 
-    # Check if the request was successful (status code 200)
-    if response.status_code == 200:
-        # Parse the response as JSON
-        data = response.json()
-        if data["result"]["total"] == 0:
-            await update.message.reply_text("אין תוצאות למספר רכב זה")
-            await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered a non existing plate number: {plate}", "lost", context)
-            return
-        disabled = is_disabled(plate)
-        data["result"]["records"][0]["disabled"] = "כן" if disabled else "לא"
-        result = json_to_message(data["result"]["records"])
-                            
-        await update.message.reply_text(f"{result}", parse_mode="Markdown")
-        await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) checked plate number {plate}", "plates", context)
     
-    # If the request was not successful
-    else:
-        await update.message.reply_text(
-            "שגיאת תקשורת, אנא נסה שוב מאוחר יותר."
-        )
-        await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) tried to check plate number {plate} but got an error", "lost", context)
+    # Check if the request was successful (status code 200)
+    data = getData(plate)
+    
+    
+    result = json_to_message(data)
+                            
+    await update.message.reply_text(f"{result}", parse_mode="Markdown")
+    await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) checked plate number {plate}", "plates", context)
+
         
 # admin command to send a broadcast message to all users
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
