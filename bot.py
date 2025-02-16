@@ -71,7 +71,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def json_to_message(data):
     basic = data['basic']
     model = data['model']
-    history = f"{data['history']} ק\"מ\n" if data['history'] != None else "לא ידוע"
+    history = f"{data['history']} ק\"מ" if data['history'] != None else "לא ידוע"
     disabled = "כן" if data['disabled'] == 1 else "לא"
 
     # replace all None values with "לא ידוע"
@@ -86,6 +86,7 @@ def json_to_message(data):
         f"🔢 *מספר דגם:* {basic['degem_nm']}\n"
         f"⚙️ *מנוע:* {basic['degem_manoa']}\n"
         f"🔩 *נפח מנוע:* {model['nefah_manoa']}\n"
+        f"🐎 *כוח סוס:* {model['koah_sus']} כ\"ס\n"
         f"📅 *שנת ייצור:* `{basic['shnat_yitzur']}`\n"
         f"🛣 *תאריך עלייה לכביש:* `{basic['moed_aliya_lakvish']}`\n"
         f"🎨 *צבע:* {basic['tzeva_rechev']}\n"
