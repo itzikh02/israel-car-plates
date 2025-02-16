@@ -36,7 +36,7 @@ def getData(car_number):
     response = requests.get(f"{CAR_HISTORY_DB}{car_number}")
     if response.status_code == 200:
         if response.json()["result"]["total"] == 0:
-            carHistoryData = 0
+            carHistoryData = None
 
         else:
             carHistoryData = response.json()["result"]["records"][0]['kilometer_test_aharon']
@@ -64,6 +64,5 @@ def getData(car_number):
     }
 
     return data_summary
-
 
 

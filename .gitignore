@@ -15,4 +15,8 @@
 
 # ignore the folder "test"
 test/
+
 .DS_Store
+__pycache__/
+*.pyc
+

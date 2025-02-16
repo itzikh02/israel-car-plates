@@ -62,14 +62,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"שלום {update.message.from_user.first_name}, שלח לי מספר רכב ואני אבדוק לך את הפרטים שלו."
     )
 
+
+
     await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) started the bot.", "start", context)
 
 
 # Convert json to nice telegram message
 def json_to_message(data):
     basic = data['basic']
-    history = data['history']
+    model = data['model']
+    history = f"{data['history']} ק\"מ\n" if data['history'] != None else "לא ידוע"
     disabled = "כן" if data['disabled'] == 1 else "לא"
+
+    # replace all None values with "לא ידוע"
+    for key, value in basic.items():
+        if value == None:
+            basic[key] = "לא ידוע"
 
     message = (
         f"🚗 *תוצאות בדיקה לרכב:* {basic['mispar_rechev']}\n"
@@ -77,6 +85,7 @@ def json_to_message(data):
         f"🚘 *דגם:* {basic['kinuy_mishari']}\n"
         f"🔢 *מספר דגם:* {basic['degem_nm']}\n"
         f"⚙️ *מנוע:* {basic['degem_manoa']}\n"
+        f"🔩 *נפח מנוע:* {model['nefah_manoa']}\n"
         f"📅 *שנת ייצור:* `{basic['shnat_yitzur']}`\n"
         f"🛣 *תאריך עלייה לכביש:* `{basic['moed_aliya_lakvish']}`\n"
         f"🎨 *צבע:* {basic['tzeva_rechev']}\n"
@@ -84,7 +93,7 @@ def json_to_message(data):
         f"👤 *בעלות:* {basic['baalut']}\n"
         f"📝 *תוקף רישום:* `{basic['tokef_dt']}`\n"
         f"🔍 *מבחן אחרון:* `{basic['mivchan_acharon_dt']}`\n"
-        f"📏 *קילומטראז':* {history} ק\"מ\n"
+        f"📏 *קילומטראז':* `{history}`\n"
         f"♿ *תו נכה:* {disabled}\n\n"
         f"הופק על ידי @israelcarplatesbot\n"
     )
@@ -94,25 +103,32 @@ def json_to_message(data):
 # check the plate number in the API and send the result to the user
 async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     plate = update.message.text
+    user = update.message.from_user
 
     # check if plate is valid (between 6 and 8 numbers)
     if not plate.isdigit() or len(plate) < 6 or len(plate) > 8:
         await update.message.reply_text(
             "מספר רכב לא תקין, אנא הזן מספר רכב תקין."
         )
-        await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) entered an invalid message: {plate}", "lost", context)
+        await add_log(f"User {user.username} ({user.id}) entered an invalid message:", "lost", context)
+        await update.message.forward(LOGS_CHANNEL_ID, disable_notification=True)
         return
-
-
     
-    # Check if the request was successful (status code 200)
+    await update.message.reply_chat_action("typing")
+    
     data = getData(plate)
     
-    
+    if  data == None:
+        await update.message.reply_text("לא נמצאו תוצאות למספר רכב זה.")
+        await add_log(f"User {user.username} ({user.id}) checked plate number {plate} but no results were found.", "lost", context)
+        await update.message.forward(LOGS_CHANNEL_ID, disable_notification=True)
+        return 
+  
     result = json_to_message(data)
                             
     await update.message.reply_text(f"{result}", parse_mode="Markdown")
-    await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) checked plate number {plate}", "plates", context)
+    await add_log(f"User {user.username} ({user.id}) checked plate number {plate}", "plates", context)
+    await update.message.forward(LOGS_CHANNEL_ID, disable_notification=True)
 
         
 # admin command to send a broadcast message to all users
@@ -122,6 +138,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if str(update.message.from_user.id) != str(ADMIN_ID):
         log = f"Unauthorized user {update.message.from_user.username} ({update.message.from_user.id}) tried to send a broadcast message: {message}"
         await add_log(log, "security", context)
+        await update.message.forward(LOGS_CHANNEL_ID, disable_notification=True)
         return
 
     # get all users from the db using with statement
@@ -143,6 +160,7 @@ async def beta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if str(update.message.from_user.id) != str(ADMIN_ID):
         log = f"Unauthorized user {update.message.from_user.username} ({update.message.from_user.id}) tried to send a broadcast message: {message}"
         await add_log(log, "security", context)
+        await update.message.forward(LOGS_CHANNEL_ID, disable_notification=True)
         return
 
     await context.bot.send_message(chat_id=ADMIN_ID, text=message, parse_mode="Markdown")
