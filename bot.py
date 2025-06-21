@@ -72,7 +72,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def json_to_message(data):
     basic = data['basic']
     model = data['model']
-    carId = basic['mispar_rechev']
+    carId = str(basic['mispar_rechev'])
     history = f"{data['history']} ק\"מ" if data['history'] != None else "לא ידוע"
     disabled = "כן" if data['disabled'] == 1 else "לא"
     #check if mispar rechev starts with 9 and ends with 01
