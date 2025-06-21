@@ -45,7 +45,6 @@ async def add_log(log, log_file, context: ContextTypes.DEFAULT_TYPE):
     # send the log to the logs channel
     await context.bot.send_message(chat_id=LOGS_CHANNEL_ID, text=log, parse_mode="Markdown", disable_notification=True)
 
-
 # Define a simple command handler function
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
@@ -62,6 +61,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"שלום {update.message.from_user.first_name}, שלח לי מספר רכב ואני אבדוק לך את הפרטים שלו."
     )
 
+    await update.message.reply_chat_action()
+
 
 
     await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) started the bot.", "start", context)
@@ -71,8 +72,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def json_to_message(data):
     basic = data['basic']
     model = data['model']
+    carId = basic['mispar_rechev']
     history = f"{data['history']} ק\"מ" if data['history'] != None else "לא ידוע"
     disabled = "כן" if data['disabled'] == 1 else "לא"
+    #check if mispar rechev starts with 9 and ends with 01
+    reRegistration = f"⚠️ *רכב רשום מחדש* ⚠️\n" if carId.startswith("9") and carId.endswith("01") else None
 
     # replace all None values with "לא ידוע"
     for key, value in basic.items():
@@ -95,6 +99,7 @@ def json_to_message(data):
         f"📝 *תוקף רישום:* `{basic['tokef_dt']}`\n"
         f"🔍 *מבחן אחרון:* `{basic['mivchan_acharon_dt']}`\n"
         f"📏 *קילומטראז':* `{history}`\n"
+        f"{reRegistration}"
         f"♿ *תו נכה:* {disabled}\n\n"
         f"הופק על ידי @israelcarplatesbot\n"
     )
