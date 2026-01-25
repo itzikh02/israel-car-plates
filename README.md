@@ -40,7 +40,7 @@ cd israel-car-plates
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables:
+3. Set up environment variables (.env file):
 
 - `TELEGRAM_TOKEN` — Your Telegram bot token from BotFather
 - `LOGS_CHANNEL_ID` - Telegram channel id, will be used as logs channel.
