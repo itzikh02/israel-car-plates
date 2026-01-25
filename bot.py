@@ -11,7 +11,7 @@ from telegram.ext import (
 
 import sqlite3
 import datetime
-from betterReq import getData
+from utils.requestAPI import getData
 
 
 
@@ -45,7 +45,7 @@ async def add_log(log, log_file, context: ContextTypes.DEFAULT_TYPE):
     # send the log to the logs channel
     await context.bot.send_message(chat_id=LOGS_CHANNEL_ID, text=log, parse_mode="Markdown", disable_notification=True)
 
-# Define a simple command handler function
+# /start function
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # add user to the db using with statement
@@ -57,14 +57,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         conn.commit()
 
+    await update.message.reply_chat_action('typing')
     await update.message.reply_text(
         f"שלום {update.message.from_user.first_name}, שלח לי מספר רכב ואני אבדוק לך את הפרטים שלו."
     )
-
-    await update.message.reply_chat_action()
-
-
-
     await add_log(f"User {update.message.from_user.username} ({update.message.from_user.id}) started the bot.", "start", context)
 
 
@@ -108,6 +104,10 @@ def json_to_message(data):
 
 # check the plate number in the API and send the result to the user
 async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    
+    # Ignore updates without a message (e.g., channel posts, edited messages, callbacks)
+    if update.message is None or update.message.text is None:
+        return
     plate = update.message.text
     user = update.message.from_user
 
@@ -133,11 +133,10 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     result = json_to_message(data)
                             
     await update.message.reply_text(f"{result}", parse_mode="Markdown")
-    await add_log(f"User {user.username} ({user.id}) checked plate number {plate}", "plates", context)
-    await update.message.forward(LOGS_CHANNEL_ID, disable_notification=True)
+    await add_log(f"User {user.username} ({user.id}) checked a plate: \n{result}", "plates", context)
 
         
-# admin command to send a broadcast message to all users
+# /broadcast admin command - send a broadcast message to all users
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = " ".join(context.args)
     message = message.replace("\\n", "\n")  # Replace literal "\n" with a newline
@@ -160,6 +159,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await update.message.reply_text(f"Broadcast message sent to {len(users)} users.")
 
+# /beta admin command to test broadcast messages 
 async def beta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = " ".join(context.args)
     message = message.replace("\\n", "\n")  # Replace literal "\n" with a newline

@@ -4,7 +4,7 @@ BASIC_DB = "https://data.gov.il/api/3/action/datastore_search?resource_id=053cea
 MODELS_DB = "https://data.gov.il/api/3/action/datastore_search?resource_id=142afde2-6228-49f9-8a29-9b6c3a0cbe40&limit=1&q="
 CAR_HISTORY_DB = "https://data.gov.il/api/3/action/datastore_search?resource_id=56063a99-8a3e-4ff4-912e-5966c0279bad&q="
 DISABLED_DB = "https://data.gov.il/api/3/action/datastore_search?resource_id=c8b9f9c8-4612-4068-934f-d4acd2e3c06e&q="
-
+SPECIAL_IMPORT_DB = "https://data.gov.il/api/3/action/datastore_search?resource_id=03adc637-b6fe-402b-9937-7c3d3afc9140&q="
 
 def getData(car_number):
     # Get the basic information about the car
