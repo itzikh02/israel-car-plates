@@ -65,8 +65,12 @@ python bot.py
 
 ## Bot commands
 
+
+
 `/start` - Start the bot
+
 `/broadcast <Message>` - Send a broadcast to all the bot subscribers
+
 `/beta <Message>` - Send a test broadcast to view the message as a subscriber.
 
 ---
