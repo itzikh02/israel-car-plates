@@ -1,4 +1,5 @@
 import os
+import asyncio
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
@@ -66,38 +67,54 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Convert json to nice telegram message
 def json_to_message(data):
-    basic = data['basic']
-    model = data['model']
-    carId = str(basic['mispar_rechev'])
-    history = f"{data['history']} ק\"מ" if data['history'] != None else "לא ידוע"
-    disabled = "כן" if data['disabled'] == 1 else "לא"
-    #check if mispar rechev starts with 9 and ends with 01
-    reRegistration = f"⚠️ *רכב רשום מחדש* ⚠️\n" if carId.startswith("9") and carId.endswith("01") else ''
+    if not isinstance(data, dict):
+        return "לא נמצאו נתונים תקינים."
 
-    # replace all None values with "לא ידוע"
-    for key, value in basic.items():
-        if value == None:
-            basic[key] = "לא ידוע"
+    basic = data.get('basic') or {}
+    model = data.get('model') or {}
+    
+    def clean(val):
+        return str(val).strip() if val is not None and str(val).strip() != "" else None
+
+    # עיבוד דגם משולב
+    kinuy = clean(basic.get('kinuy_mishari'))
+    degem = clean(basic.get('degem_nm'))
+    if kinuy and degem and kinuy != degem:
+        model_display = f"{kinuy} / {degem}"
+    else:
+        model_display = kinuy or degem or "לא ידוע"
+
+    # טיפול בשדה סוג יבוא - יוצג רק אם קיים
+    sug_yevu = clean(basic.get('sug_yevu'))
+    yevu_line = f"🚢 *סוג יבוא:* {sug_yevu}\n" if sug_yevu else ""
+
+    carId = str(basic.get('mispar_rechev', ''))
+    history = f"{data.get('kilometers')} ק\"מ" if data.get('kilometers') is not None else "לא ידוע"
+    disabled = "כן" if data.get('is_disabled') == 1 else "לא"
+    reRegistration = "⚠️ *רכב רשום מחדש* ⚠️\n" if carId.startswith("9") and carId.endswith("01") else ''
+    
+    engine_capacity = model.get('nefah_manoa') or basic.get('nefach_manoa')
+    horse_power = model.get('koah_sus') or "לא ידוע"
 
     message = (
-        f"🚗 *תוצאות בדיקה לרכב:* {basic['mispar_rechev']}\n"
-        f"🏭 *יצרן:* {basic['tozeret_nm']}\n"
-        f"🚘 *דגם:* {basic['kinuy_mishari']}\n"
-        f"🔢 *מספר דגם:* {basic['degem_nm']}\n"
-        f"⚙️ *מנוע:* {basic['degem_manoa']}\n"
-        f"🔩 *נפח מנוע:* {model['nefah_manoa']}\n"
-        f"🐎 *כוח סוס:* {model['koah_sus']} כ\"ס\n"
-        f"📅 *שנת ייצור:* `{basic['shnat_yitzur']}`\n"
-        f"🛣 *תאריך עלייה לכביש:* `{basic['moed_aliya_lakvish']}`\n"
-        f"🎨 *צבע:* {basic['tzeva_rechev']}\n"
-        f"⛽ *סוג דלק:* {basic['sug_delek_nm']}\n"
-        f"👤 *בעלות:* {basic['baalut']}\n"
-        f"📝 *תוקף רישום:* `{basic['tokef_dt']}`\n"
-        f"🔍 *מבחן אחרון:* `{basic['mivchan_acharon_dt']}`\n"
+        f"🚗 *תוצאות בדיקה לרכב:* {carId}\n"
+        f"🏭 *יצרן:* {clean(basic.get('tozeret_nm')) or 'לא ידוע'}\n"
+        f"🚘 *דגם:* {model_display}\n"
+        f"{yevu_line}"  # השורה תתווסף כאן רק אם יש תוכן
+        f"⚙️ *מנוע:* {clean(basic.get('degem_manoa')) or 'לא ידוע'}\n"
+        f"🔩 *נפח מנוע:* {clean(engine_capacity) or 'לא ידוע'}\n"
+        f"🐎 *כוח סוס:* {horse_power} כ\"ס\n"
+        f"📅 *שנת ייצור:* `{clean(basic.get('shnat_yitzur')) or 'לא ידוע'}`\n"
+        f"🛣 *תאריך עלייה לכביש:* `{clean(basic.get('moed_aliya_lakvish')) or 'לא ידוע'}`\n"
+        f"🎨 *צבע:* {clean(basic.get('tzeva_rechev')) or 'לא ידוע'}\n"
+        f"⛽ *סוג דלק:* {clean(basic.get('sug_delek_nm')) or 'לא ידוע'}\n"
+        f"👤 *בעלות:* {clean(basic.get('baalut')) or 'לא ידוע'}\n"
+        f"📝 *תוקף רישום:* `{clean(basic.get('tokef_dt')) or 'לא ידוע'}`\n"
+        f"🔍 *מבחן אחרון:* `{clean(basic.get('mivchan_acharon_dt')) or 'לא ידוע'}`\n"
         f"📏 *קילומטראז':* `{history}`\n"
-        f"{reRegistration}\n"
+        f"{reRegistration}"
         f"♿ *תו נכה:* {disabled}\n\n"
-        f"הופק על ידי @israelcarplatesbot\n"
+        f"הופק על ידי @israelcarplatesbot"
     )
 
     return message
@@ -114,7 +131,7 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # check if plate is valid (between 6 and 8 numbers)
     if not plate.isdigit() or len(plate) < 6 or len(plate) > 8:
         await update.message.reply_text(
-            "מספר רכב לא תקין, אנא הזן מספר רכב תקין."
+           " אנא הזן מספר רכב תקין."
         )
         await add_log(f"User {user.username} ({user.id}) entered an invalid message:", "lost", context)
         await update.message.forward(LOGS_CHANNEL_ID, disable_notification=True)
@@ -122,7 +139,7 @@ async def check_plate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     
     await update.message.reply_chat_action("typing")
     
-    data = getData(plate)
+    data = await getData(plate)
     
     if  data == None:
         await update.message.reply_text("לא נמצאו תוצאות למספר רכב זה.")
@@ -174,6 +191,7 @@ async def beta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Main function to set up and start the bot
 def main():
+    
     if TELEGRAM_TOKEN is None:
         print("Error: No token found in the .env file")
         return
@@ -190,6 +208,6 @@ def main():
 
     # Start the bot
     application.run_polling()
-
+    
 if __name__ == "__main__":
     main()
