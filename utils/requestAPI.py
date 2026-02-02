@@ -26,35 +26,34 @@ async def fetch(session, resource_id, query, limit=1):
 
 async def getData(car_number):
     async with aiohttp.ClientSession() as session:
-    
-        tasks = [
-            fetch(session, ENDPOINTS["basic"], car_number),
-            fetch(session, ENDPOINTS["history"], car_number),
-            fetch(session, ENDPOINTS["disabled"], car_number)
-        ]
-        basic_res, history_res, disabled_res = await asyncio.gather(*tasks)
-
-        special_import_res = None
+        # Launch all initial requests that only depend on car_number
+        tasks = {
+            "basic": fetch(session, ENDPOINTS["basic"], car_number),
+            "history": fetch(session, ENDPOINTS["history"], car_number),
+            "disabled": fetch(session, ENDPOINTS["disabled"], car_number),
+            "special": fetch(session, ENDPOINTS["special_import"], car_number)
+        }
         
+        # Wait for all of them together
+        results = await asyncio.gather(*tasks.values())
+        res_dict = dict(zip(tasks.keys(), results))
 
+        # Determine which basic info to use
+        basic_res = res_dict["basic"] or res_dict["special"]
+        
         if not basic_res:
-            special_import_res = await fetch(session, ENDPOINTS["special_import"], car_number)
-            
-     
-            if not special_import_res:
-                return None  
-            
-        
-            basic_res = special_import_res
+            return None
 
-
+        # Only the 'models' request stays sequential because it depends on basic_res
         degem_nm = basic_res.get("degem_nm")
-        model_res = await fetch(session, ENDPOINTS["models"], degem_nm, 1) if degem_nm else None
+        model_res = None
+        if degem_nm:
+            model_res = await fetch(session, ENDPOINTS["models"], degem_nm)
 
         return {
             "basic": basic_res,
             "model": model_res,
-            "special_import": special_import_res,
-            "kilometers": history_res.get('kilometer_test_aharon') if history_res else None,
-            "is_disabled": 1 if disabled_res else 0
+            "special_import": res_dict["special"] if not res_dict["basic"] else None,
+            "kilometers": res_dict["history"].get('kilometer_test_aharon') if res_dict["history"] else None,
+            "is_disabled": 1 if res_dict["disabled"] else 0
         }
