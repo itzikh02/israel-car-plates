@@ -6,7 +6,8 @@ ENDPOINTS = {
     "history": "56063a99-8a3e-4ff4-912e-5966c0279bad",
     "disabled": "c8b9f9c8-4612-4068-934f-d4acd2e3c06e",
     "models": "142afde2-6228-49f9-8a29-9b6c3a0cbe40",
-    "special_import": "03adc637-b6fe-402b-9937-7c3d3afc9140"
+    "special_import": "03adc637-b6fe-402b-9937-7c3d3afc9140",
+    "dead_cars": "851ecab1-0622-4dbe-a6c7-f950cf82abf9"
 }
 
 BASE_URL = "https://data.gov.il/api/3/action/datastore_search"
@@ -40,9 +41,15 @@ async def getData(car_number):
 
         # Determine which basic info to use
         basic_res = res_dict["basic"] or res_dict["special"]
-        
+        is_dead = False
+
         if not basic_res:
-            return None
+            # Last resort: check the cancelled/dead cars registry
+            basic_res = await fetch(session, ENDPOINTS["dead_cars"], car_number)
+            if basic_res:
+                is_dead = True
+            else:
+                return None
 
         # Only the 'models' request stays sequential because it depends on basic_res
         degem_nm = basic_res.get("degem_nm")
@@ -55,5 +62,6 @@ async def getData(car_number):
             "model": model_res,
             "special_import": res_dict["special"] if not res_dict["basic"] else None,
             "kilometers": res_dict["history"].get('kilometer_test_aharon') if res_dict["history"] else None,
-            "is_disabled": 1 if res_dict["disabled"] else 0
+            "is_disabled": 1 if res_dict["disabled"] else 0,
+            "is_dead": is_dead
         }

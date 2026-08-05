@@ -72,7 +72,8 @@ def json_to_message(data):
 
     basic = data.get('basic') or {}
     model = data.get('model') or {}
-    
+    is_dead = data.get('is_dead', False)
+
     def clean(val):
         return str(val).strip() if val is not None and str(val).strip() != "" else None
 
@@ -88,15 +89,23 @@ def json_to_message(data):
     sug_yevu = clean(basic.get('sug_yevu'))
     yevu_line = f"🚢 *סוג יבוא:* {sug_yevu}\n" if sug_yevu else ""
 
+    # רכב מבוטל - הצגת אזהרה ותאריך ביטול
+    bitul_dt = clean(basic.get('bitul_dt'))
+    if bitul_dt:
+        # trim time part if present (e.g. "2020-07-13 00:00:00" -> "2020-07-13")
+        bitul_dt = bitul_dt.split(" ")[0]
+    dead_banner = f"🚫 *ירד מהכביש \ עבר ביטול סופי* 🚫\n *החל מהתאריך:* `{bitul_dt or 'לא ידוע'}`\n\n" if is_dead else ""
+
     carId = str(basic.get('mispar_rechev', ''))
     history = f"{data.get('kilometers')} ק\"מ" if data.get('kilometers') is not None else "לא ידוע"
     disabled = "כן" if data.get('is_disabled') == 1 else "לא"
     reRegistration = "⚠️ *רכב רשום מחדש* ⚠️\n" if carId.startswith("9") and carId.endswith("01") else ''
-    
+
     engine_capacity = model.get('nefah_manoa') or basic.get('nefach_manoa')
     horse_power = model.get('koah_sus') or "לא ידוע"
 
     message = (
+        f"{dead_banner}"
         f"🚗 *תוצאות בדיקה לרכב:* {carId}\n"
         f"🏭 *יצרן:* {clean(basic.get('tozeret_nm')) or 'לא ידוע'}\n"
         f"🚘 *דגם:* {model_display}\n"
