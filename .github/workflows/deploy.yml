@@ -7,6 +7,10 @@ on:
         description: 'Select branch to deploy'
         required: true
         default: 'main'
+        type: choice
+        options:
+          - main
+          - dev
 
 jobs:
   deploy:
