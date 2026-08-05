@@ -220,6 +220,40 @@ async def beta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_message(chat_id=ADMIN_ID, text=message, parse_mode="Markdown")
 
 
+# /cleanup admin command - remove users who have blocked the bot from the DB
+async def cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if str(update.message.from_user.id) != str(ADMIN_ID):
+        return
+
+    with sqlite3.connect("./db/users.db") as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users")
+        users = cursor.fetchall()
+
+    await update.message.reply_text(f"Checking {len(users)} users...")
+
+    blocked_users = []
+    for user in users:
+        try:
+            await context.bot.send_chat_action(chat_id=user["id"], action="typing")
+        except telegram_error.Forbidden:
+            blocked_users.append(user["id"])
+        except Exception:
+            pass  # Network issues etc. — don't remove
+
+    if blocked_users:
+        with sqlite3.connect("./db/users.db") as conn:
+            cursor = conn.cursor()
+            cursor.executemany("DELETE FROM users WHERE id = ?", [(uid,) for uid in blocked_users])
+            conn.commit()
+        await add_log(f"Cleanup removed {len(blocked_users)} blocked user(s) from DB.", "broadcast", context)
+
+    await update.message.reply_text(
+        f"✅ Cleanup done. Removed {len(blocked_users)} blocked user(s) out of {len(users)} total."
+    )
+
+
 # Error handler — catches unhandled exceptions during updates
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     error = context.error
@@ -246,6 +280,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CommandHandler("beta", beta))
+    application.add_handler(CommandHandler("cleanup", cleanup))
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, check_plate)
     )
