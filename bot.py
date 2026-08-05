@@ -1,6 +1,8 @@
 import os
+import sys
 from dotenv import load_dotenv
 from telegram import Update
+from telegram import error as telegram_error
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -180,10 +182,30 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         users = cursor.fetchall()
 
     # Send the message to all the users
+    sent_count = 0
+    blocked_users = []
     for user in users:
-        await context.bot.send_message(chat_id=user["id"], text=message, parse_mode="Markdown")
+        try:
+            await context.bot.send_message(chat_id=user["id"], text=message, parse_mode="Markdown")
+            sent_count += 1
+        except telegram_error.Forbidden:
+            # User has blocked the bot — remove them from the DB
+            blocked_users.append(user["id"])
+            await add_log(f"User {user['id']} has blocked the bot. Removing from DB.", "broadcast", context)
+        except Exception as e:
+            await add_log(f"Failed to send broadcast to user {user['id']}: {e}", "broadcast", context)
 
-    await update.message.reply_text(f"Broadcast message sent to {len(users)} users.")
+    # Remove blocked users from the DB
+    if blocked_users:
+        with sqlite3.connect("./db/users.db") as conn:
+            cursor = conn.cursor()
+            cursor.executemany("DELETE FROM users WHERE id = ?", [(uid,) for uid in blocked_users])
+            conn.commit()
+
+    await update.message.reply_text(
+        f"Broadcast sent to {sent_count}/{len(users)} users."
+        + (f" Removed {len(blocked_users)} blocked user(s)." if blocked_users else "")
+    )
 
 # /beta admin command to test broadcast messages 
 async def beta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -196,6 +218,19 @@ async def beta(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     await context.bot.send_message(chat_id=ADMIN_ID, text=message, parse_mode="Markdown")
+
+
+# Error handler — catches unhandled exceptions during updates
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    error = context.error
+    if isinstance(error, telegram_error.Conflict):
+        print(
+            "[ERROR] Conflict: Another bot instance is already running. "
+            "Make sure only one instance of bot.py is active and try again."
+        )
+        sys.exit(1)
+    # Log all other errors
+    await add_log(f"Unhandled error: {error}", "errors", context)
 
 
 # Main function to set up and start the bot
@@ -214,6 +249,9 @@ def main():
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, check_plate)
     )
+
+    # Register the global error handler
+    application.add_error_handler(error_handler)
 
     # Start the bot
     application.run_polling()
