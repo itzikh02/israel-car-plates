@@ -69,6 +69,8 @@ python bot.py
 
 `/start` - Start the bot
 
+`/cleanup` - Remove users who have blocked the bot from the DB
+
 `/broadcast <Message>` - Send a broadcast to all the bot subscribers
 
 `/beta <Message>` - Send a test broadcast to view the message as a subscriber.
