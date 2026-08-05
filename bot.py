@@ -21,6 +21,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
 LOGS_CHANNEL_ID = os.getenv("LOGS_CHANNEL_ID")
 
+# connect to the database and create table if missing
 conn = sqlite3.connect("./db/users.db")
 cursor = conn.cursor()
 cursor.execute(
@@ -99,7 +100,7 @@ def json_to_message(data):
         f"🚗 *תוצאות בדיקה לרכב:* {carId}\n"
         f"🏭 *יצרן:* {clean(basic.get('tozeret_nm')) or 'לא ידוע'}\n"
         f"🚘 *דגם:* {model_display}\n"
-        f"{yevu_line}"  # השורה תתווסף כאן רק אם יש תוכן
+        f"{yevu_line}"
         f"⚙️ *מנוע:* {clean(basic.get('degem_manoa')) or 'לא ידוע'}\n"
         f"🔩 *נפח מנוע:* {clean(engine_capacity) or 'לא ידוע'}\n"
         f"🐎 *כוח סוס:* {horse_power} כ\"ס\n"
