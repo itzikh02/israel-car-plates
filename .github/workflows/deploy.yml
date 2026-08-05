@@ -1,12 +1,7 @@
 name: Deploy Israel Car Plates Bot
 
 on:
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Select branch to deploy'
-        required: true
-        default: 'main'
+  workflow_dispatch
 
 jobs:
   deploy:
@@ -22,6 +17,6 @@ jobs:
           script: |
             cd /opt/telegram-bots/israel-car-plates
             git fetch origin
-            git checkout ${{ github.event.inputs.branch }}
-            git pull origin ${{ github.event.inputs.branch }}
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
             sudo systemctl restart israel-car-plates-bot
