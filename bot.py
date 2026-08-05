@@ -11,6 +11,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
+import asyncio
 import sqlite3
 import datetime
 from utils.requestAPI import getData
@@ -39,14 +40,32 @@ conn.close()
 
 
 # send logs to file and to logs channel
+# NOTE: this function must never raise — callers rely on it being safe
 async def add_log(log, log_file, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.now()
     log = f"{now.strftime('%Y-%m-%d %H:%M:%S')} {log}"
     with open(f"./logs/{log_file}.log", "a") as f:
         f.write(log + "\n")
-    
-    # send the log to the logs channel
-    await context.bot.send_message(chat_id=LOGS_CHANNEL_ID, text=log, parse_mode="Markdown", disable_notification=True)
+
+    # Send the log to the logs channel — handle rate limits and other errors gracefully
+    try:
+        await context.bot.send_message(
+            chat_id=LOGS_CHANNEL_ID, text=log,
+            parse_mode="Markdown", disable_notification=True
+        )
+    except telegram_error.RetryAfter as e:
+        # Flood control hit — wait and retry once, then give up
+        await asyncio.sleep(e.retry_after + 1)
+        try:
+            await context.bot.send_message(
+                chat_id=LOGS_CHANNEL_ID, text=log,
+                parse_mode="Markdown", disable_notification=True
+            )
+        except Exception:
+            pass  # Give up silently; message is already written to file
+    except Exception as e:
+        # Channel unreachable etc. — log to stderr, never crash the caller
+        print(f"[add_log] Failed to send log to channel: {e}", flush=True)
 
 # /start function
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -182,29 +201,48 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         users = cursor.fetchall()
 
     # Send the message to all the users
+    # 50 ms gap between messages keeps us well within Telegram's flood limits
     sent_count = 0
     blocked_users = []
+    failed_users = []
     for user in users:
         try:
             await context.bot.send_message(chat_id=user["id"], text=message, parse_mode="Markdown")
             sent_count += 1
         except telegram_error.Forbidden:
-            # User has blocked the bot — remove them from the DB
+            # Blocked or deactivated account — mark for removal, log later in bulk
             blocked_users.append(user["id"])
-            await add_log(f"User {user['id']} has blocked the bot. Removing from DB.", "broadcast", context)
-        except Exception as e:
-            await add_log(f"Failed to send broadcast to user {user['id']}: {e}", "broadcast", context)
+        except telegram_error.RetryAfter as e:
+            # Hit flood control mid-broadcast — wait, then retry this user once
+            await asyncio.sleep(e.retry_after + 1)
+            try:
+                await context.bot.send_message(chat_id=user["id"], text=message, parse_mode="Markdown")
+                sent_count += 1
+            except Exception:
+                failed_users.append(user["id"])
+        except Exception:
+            failed_users.append(user["id"])
+        await asyncio.sleep(0.05)  # ~20 msg/sec — safely under Telegram's 30 msg/sec limit
 
-    # Remove blocked users from the DB
+    # Remove blocked/deactivated users from the DB
     if blocked_users:
         with sqlite3.connect("./db/users.db") as conn:
             cursor = conn.cursor()
             cursor.executemany("DELETE FROM users WHERE id = ?", [(uid,) for uid in blocked_users])
             conn.commit()
 
+    # One summary log instead of one log per bad user (avoids spamming the channel)
+    summary = (
+        f"Broadcast complete: {sent_count}/{len(users)} sent."
+        + (f" Removed {len(blocked_users)} blocked/deactivated." if blocked_users else "")
+        + (f" {len(failed_users)} other failures." if failed_users else "")
+    )
+    await add_log(summary, "broadcast", context)
+
     await update.message.reply_text(
         f"Broadcast sent to {sent_count}/{len(users)} users."
-        + (f" Removed {len(blocked_users)} blocked user(s)." if blocked_users else "")
+        + (f" Removed {len(blocked_users)} blocked/deactivated user(s)." if blocked_users else "")
+        + (f" {len(failed_users)} failed." if failed_users else "")
     )
 
 # /beta admin command to test broadcast messages 
@@ -263,7 +301,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             "Make sure only one instance of bot.py is active and try again."
         )
         sys.exit(1)
-    # Log all other errors
+    if isinstance(error, telegram_error.RetryAfter):
+        # Already handled at the call site — skip logging to avoid a flood-control loop
+        print(f"[error_handler] RetryAfter skipped: {error}", flush=True)
+        return
+    # Log all other unexpected errors
     await add_log(f"Unhandled error: {error}", "errors", context)
 
 
